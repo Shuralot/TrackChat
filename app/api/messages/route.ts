@@ -1,19 +1,19 @@
+// ./app/api/messages/route.ts
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const messages = await prisma.message.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" }, // do mais antigo para o mais recente
     include: {
       conversation: {
         include: {
-          contact: true, // 🔹 garante que cada mensagem venha com o contato
+          contact: true,
         },
       },
     },
   });
 
-  // Transformar para o formato que o front espera
   const formattedMessages = messages.map(msg => ({
     id: msg.id,
     chatwootMessageId: msg.chatwootMessageId,

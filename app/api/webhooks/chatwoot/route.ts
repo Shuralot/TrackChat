@@ -1,26 +1,33 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-
+import { prisma } from "@/lib/prisma";
 export async function POST(req: Request) {
   const payload = await req.json();
 
   if (payload.event !== "message_created") return NextResponse.json({ ok: true });
 
-  const msgPayload = payload.message;
+  // No payload que você recebeu, a mensagem é o payload inteiro
+  const msgPayload = payload;
 
-  // Upsert do contato
+  if (!msgPayload || !msgPayload.sender) {
+    console.error("Payload inválido:", payload);
+    return NextResponse.json({ ok: false, error: "Mensagem sem sender" });
+  }
+
+  const sender = msgPayload.sender;
+
+  // 1️⃣ Upsert do contato
   const contact = await prisma.contact.upsert({
-    where: { chatwootContactId: payload.contact.id.toString() },
-    update: { name: payload.contact.name, email: payload.contact.email, avatar: payload.contact.avatar },
+    where: { chatwootContactId: sender.id.toString() },
+    update: { name: sender.name, email: sender.email },
     create: {
-      chatwootContactId: payload.contact.id.toString(),
-      name: payload.contact.name,
-      email: payload.contact.email,
-      avatar: payload.contact.avatar,
+      chatwootContactId: sender.id.toString(),
+      name: sender.name,
+      email: sender.email,
+      avatar: sender.avatar || "",
     },
   });
 
-  // Upsert da conversa
+  // 2️⃣ Upsert da conversa
   const conversation = await prisma.conversation.upsert({
     where: { chatwootConversationId: msgPayload.conversation.id.toString() },
     update: {
@@ -38,7 +45,7 @@ export async function POST(req: Request) {
     },
   });
 
-  // Upsert da mensagem
+  // 3️⃣ Upsert da mensagem
   const message = await prisma.message.upsert({
     where: { chatwootMessageId: msgPayload.id.toString() },
     update: {},
@@ -57,7 +64,7 @@ export async function POST(req: Request) {
     },
   });
 
-  // Emite para Socket.IO
+  // 4️⃣ Emit via Socket
   try {
     await fetch(`${process.env.SOCKET_SERVER_URL}/emit-message`, {
       method: "POST",
@@ -69,11 +76,8 @@ export async function POST(req: Request) {
         sender: message.sender,
         isRead: message.isRead,
         conversationId: conversation.id,
-        conversationStatus: conversation.status,
-        conversationUnreadCount: conversation.unreadCount,
-        contact: { id: contact.id, name: contact.name, avatar: contact.avatar },
+        contact: { id: contact.id, name: contact.name },
         createdAt: message.createdAt,
-        additionalAttributes: msgPayload.conversation.additional_attributes || {},
       }),
     });
   } catch (err) {

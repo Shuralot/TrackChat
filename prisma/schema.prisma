@@ -7,23 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum SenderType {
-  USER
-  AGENT
-  BOT
-}
-
 model Conversation {
   id                     String    @id @default(uuid())
   chatwootConversationId String    @unique
   unreadCount            Int       @default(0)
   status                 String?
   contactId              String?
-  contact                Contact?  @relation(fields: [contactId], references: [id])
   lastMessageAt          DateTime?
-  messages               Message[]
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+  contact                Contact?  @relation(fields: [contactId], references: [id])
+  messages               Message[]
 }
 
 model Contact {
@@ -32,9 +26,9 @@ model Contact {
   name              String
   email             String?
   avatar            String?
-  conversations     Conversation[] // Prisma consegue inferir a relação
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  conversations     Conversation[]
 }
 
 model Message {
@@ -44,6 +38,12 @@ model Message {
   sender            SenderType
   isRead            Boolean      @default(false)
   conversationId    String
-  conversation      Conversation @relation(fields: [conversationId], references: [id])
   createdAt         DateTime     @default(now())
+  conversation      Conversation @relation(fields: [conversationId], references: [id])
+}
+
+enum SenderType {
+  USER
+  AGENT
+  BOT
 }

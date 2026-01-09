@@ -5,16 +5,12 @@ import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
 import { 
   AlertTriangle, Clock, Zap, Users, MessageSquare, 
-  Search, Bell, Headphones 
+  Search, Bell, Headphones, Lock 
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface Contact {
-  id: string;
-  name: string;
-}
-
+interface Contact { id: string; name: string; }
 interface Message {
   id: string;
   chatwootMessageId: string;
@@ -30,7 +26,7 @@ export default function QueueDashboard() {
   const { messages, setMessages, addMessage } = useChatStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Agrupando mensagens por conversa
+  // Agrupa mensagens por conversa
   const conversationsGrouped = messages.reduce<Record<string, Message[]>>((acc, msg) => {
     if (!acc[msg.conversationId]) acc[msg.conversationId] = [];
     acc[msg.conversationId].push(msg);
@@ -40,40 +36,57 @@ export default function QueueDashboard() {
   const unansweredCount = messages.filter(m => !m.isRead).length;
 
   useEffect(() => {
-    // Carrega mensagens iniciais do backend
-    fetch("/api/messages")
-      .then(res => res.json())
-      .then(setMessages);
-
     const socket = getSocket();
 
-    // Entrar em rooms por conversa
-    Object.keys(conversationsGrouped).forEach(convoId => {
-      socket.emit("join_conversation", convoId);
-    });
+    // Função para entrar em uma conversa
+    const joinConversation = (conversationId: string) => {
+      if (!conversationId) return;
+      socket.emit("join_conversation", conversationId);
+    };
 
-    socket.on("new_message", (message: Message) => {
+    // Buscar mensagens iniciais
+    fetch("/api/messages")
+      .then(res => res.json())
+      .then((msgs: Message[]) => {
+        setMessages(msgs);
+        // Entrar em todas as salas já existentes
+        const allConversationIds = Array.from(new Set(msgs.map(m => m.conversationId)));
+        allConversationIds.forEach(joinConversation);
+      });
+
+    // Receber mensagens novas
+    const handleNewMessage = (message: Message) => {
+      // Entrar na sala se ainda não estiver
+      joinConversation(message.conversationId);
+
+      // Adicionar a mensagem
       addMessage(message);
-      socket.emit("join_conversation", message.conversationId); // entra na room se nova conversa
-      new Audio("/notification.mp3").play();
-    });
 
-    return () => socket.off("new_message");
+      // Tocar áudio se o usuário estiver ativo na página
+      if (document.visibilityState === "visible") {
+        new Audio("/notification.mp3").play().catch(() => {
+          console.warn("Não foi possível tocar o áudio de notificação");
+        });
+      }
+    };
+
+    socket.on("new_message", handleNewMessage);
+
+    return () => {
+      socket.off("new_message", handleNewMessage);
+    };
   }, [addMessage, setMessages]);
 
+  // Scroll automático
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const getIcon = (sender: Message["sender"]) => {
     switch (sender) {
-      case "AGENT":
-        return <Headphones size={18} />;
-      case "USER":
-        return <MessageSquare size={18} />;
-      case "BOT":
-      default:
-        return <Lock size={18} />;
+      case "AGENT": return <Headphones size={18} />;
+      case "USER": return <MessageSquare size={18} />;
+      default: return <Lock size={18} />;
     }
   };
 
@@ -85,16 +98,9 @@ export default function QueueDashboard() {
       {/* HEADER */}
       <header className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">Ai</span>
-          <h1 className="text-xl font-semibold text-gray-200">Track Chat - Real Time</h1>
-        </div>
-        <div className="flex items-center gap-4 text-gray-400">
-          <Search className="w-5 h-5 cursor-pointer hover:text-white" />
-          <Bell className="w-5 h-5 cursor-pointer hover:text-white" />
-          <div className="w-8 h-8 rounded-full bg-gray-600 overflow-hidden border border-gray-500">
-            <img src="https://github.com/shadcn.png" alt="User" />
-          </div>
-        </div>
+          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">Ai Atende</span>
+          <h1 className="text-xl font-semibold text-gray-200">Track Chat</h1>
+        </div>  
       </header>
 
       {/* KPI CARDS */}
@@ -132,7 +138,7 @@ export default function QueueDashboard() {
       {/* QUEUE LIST */}
       <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
         {Object.entries(conversationsGrouped).map(([convoId, msgs]) => {
-          const contactName = msgs[0]?.contact.name || "Sem Contato";
+          const contactName = msgs[0]?.contact?.name || "Sem Contato";
           const unreadCount = msgs.filter(m => !m.isRead).length;
 
           return (
@@ -145,7 +151,7 @@ export default function QueueDashboard() {
                   </span>
                 )}
               </div>
-              {msgs.map((msg) => (
+              {msgs.map(msg => (
                 <div key={msg.id} className="flex items-center gap-3 mb-2 p-2 rounded hover:bg-[#252830] transition-colors border-l-4 border-transparent relative overflow-hidden">
                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusColor(msg.isRead).split(' ')[0]}`}></div>
                   <div className={`p-2 rounded-full bg-opacity-10 ${getStatusColor(msg.isRead)}`}>
@@ -153,7 +159,7 @@ export default function QueueDashboard() {
                   </div>
                   <div className="flex-1 flex flex-col">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-gray-400 text-xs">ID: {msg.chatwootMessageId?.slice(0, 8)}</span>
+                      <span className="text-gray-400 text-xs">ID: {msg.chatwootMessageId?.slice(0,8)}</span>
                       <span className="text-gray-600">|</span>
                       <span className={`text-sm font-bold ${!msg.isRead ? 'text-orange-400' : 'text-gray-300'}`}>
                         HÁ: {formatDistanceToNow(new Date(msg.createdAt), { locale: ptBR })}
