@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   app:
     build: .
@@ -13,9 +11,9 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: trackchat
       POSTGRES_USER: trackchat
       POSTGRES_PASSWORD: trackchat
+      POSTGRES_DB: trackchat
     volumes:
       - pgdata:/var/lib/postgresql/data
 
