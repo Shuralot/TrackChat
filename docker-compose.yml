@@ -8,6 +8,12 @@ services:
     depends_on:
       - db
 
+  socket:
+    build: ./socket
+    ports:
+      - "4000:4000"
+    restart: always
+
   db:
     image: postgres:15
     environment:

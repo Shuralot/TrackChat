@@ -8,30 +8,30 @@ export function ChatContainer() {
   const { messages, markAsRead } = useChatStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll para a última mensagem
   useEffect(() => {
-    // Auto-scroll para novas mensagens
-    containerRef.current?.scrollTo({
-      top: 0,
-      behavior: 'smooth',
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+
+    // Marca todas mensagens novas como lidas
+    messages.forEach(msg => {
+      if (!msg.isRead) markAsRead(msg.id);
     });
-  }, [messages]);
+  }, [messages, markAsRead]);
 
   return (
     <div
       ref={containerRef}
-      className="flex flex-col gap-6 overflow-y-auto h-[calc(100vh-120px)] pr-4"
+      className="flex-1 flex flex-col gap-6 overflow-y-auto pr-4"
     >
       {messages.map((msg) => (
-        <div
+        <MessageItem
           key={msg.id}
-          onMouseEnter={() => markAsRead(msg.id)}
-        >
-          <MessageItem
-            sender={msg.sender}
-            content={msg.content}
-            isRead={msg.isRead}
-          />
-        </div>
+          sender={msg.sender}
+          content={msg.content}
+          isRead={msg.isRead}
+        />
       ))}
     </div>
   );

@@ -1,13 +1,12 @@
-import { Server } from 'socket.io';
+import { io, Socket } from "socket.io-client";
 
-export const initSocket = (server: any) => {
-  const io = new Server(server, {
-    cors: { origin: '*' },
-  });
+let socket: Socket | null = null;
 
-  io.on('connection', (socket) => {
-    console.log('Monitor conectado');
-  });
-
-  return io;
-};
+export function getSocket() {
+  if (!socket) {
+    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL!, {
+      transports: ["websocket"],
+    });
+  }
+  return socket;
+}

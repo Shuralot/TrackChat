@@ -1,10 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { Server } from 'socket.io';
-
-declare global {
-  var io: Server | undefined;
-}
 
 export async function POST(req: Request) {
   const payload = await req.json();
@@ -16,6 +11,7 @@ export async function POST(req: Request) {
   const message = payload.message;
   const conversationId = payload.conversation.id.toString();
 
+  // Upsert da conversa
   const conversation = await prisma.conversation.upsert({
     where: { chatwootConversationId: conversationId },
     update: {
@@ -28,6 +24,7 @@ export async function POST(req: Request) {
     },
   });
 
+  // Salva a mensagem
   const savedMessage = await prisma.message.create({
     data: {
       chatwootMessageId: message.id.toString(),
@@ -37,9 +34,15 @@ export async function POST(req: Request) {
     },
   });
 
-  // Emite para os monitores
-  if (global.io) {
-    global.io.emit('new-message', savedMessage);
+  // Emite para Socket Server externo
+  try {
+    await fetch(`${process.env.SOCKET_SERVER_URL}/emit-message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(savedMessage),
+    });
+  } catch (err) {
+    console.error("Failed to emit message to socket server", err);
   }
 
   return NextResponse.json({ success: true });
