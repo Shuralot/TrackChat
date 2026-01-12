@@ -1,37 +1,146 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 TrackChat — AI Atende
 
-## Getting Started
+**TrackChat** é uma plataforma interna desenvolvida pela **AI Atende** para **monitoramento e visualização em tempo real das mensagens do Chatwoot**, focada em operações de atendimento humano + IA.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🧠 Visão Geral
+
+- Recebe mensagens via **Webhook do Chatwoot**
+- Persiste dados com **PostgreSQL + Prisma**
+- Distribui mensagens em tempo real com **Socket.IO**
+- Exibe um **dashboard operacional em tempo real** com **Next.js**
+
+---
+
+## 🧩 Arquitetura
+
+```
+Chatwoot
+  → Webhook (Next.js API)
+  → PostgreSQL (Prisma)
+  → Socket Server (Express + Socket.IO)
+  → Dashboardem tempo real (Next.js)
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ✨ Funcionalidades
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- 📡 Mensagens em tempo real
+- 👥 Agrupamento por conversas e grupos do Chatwoot
+- 🔔 Notificação sonora de novas mensagens
+- 📊 Indicadores operacionais (não lidas, total, status)
+- ⚡ Atualização instantânea sem refresh
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠️ Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Frontend
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Next.js (App Router)
+- React
+- TypeScript
+- TailwindCSS
+- Zustand
+- Socket.IO Client
 
-## Deploy on Vercel
+### Backend
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Next.js API Routes
+- Express
+- Socket.IO
+- Prisma ORM
+- PostgreSQL
+- Docker
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-"# TrackChat" 
+---
+
+## 🗄️ Banco de Dados
+
+Modelado para lidar com **contatos, grupos, conversas e mensagens** do Chatwoot.
+
+**Principais entidades:**
+
+- Contact
+- Conversation
+- Message
+- SenderType (USER | AGENT | BOT)
+
+---
+
+## 🔗 Integração com Chatwoot
+
+- Webhook `message_created`
+- Suporte a mensagens de usuários, agentes e bots
+- Identificação de grupos (ex: WhatsApp Groups)
+- Associação automática entre contato, conversa e mensagens
+
+---
+
+## 📦 Estrutura do Projeto
+
+```
+app/
+ └─ api/
+    ├─ messages
+    └─ webhooks/chatwoot
+
+lib/
+ ├─ prisma.ts
+ └─ socket.ts
+
+store/
+ └─ chatStore.ts
+
+prisma/
+ └─schema.prisma
+
+src/
+ └─index.ts  (SocketServer)
+
+```
+
+---
+
+## ⚙️ Variáveis de Ambiente
+
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/trackchat
+NODE_ENV=development
+
+NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
+SOCKET_SERVER_URL=http://localhost:4000
+
+```
+
+---
+
+## 🚀 Rodando o Projeto
+
+```
+npm install
+docker compose up -d
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+
+```
+
+Acesse:
+
+[**http://localhost:3000**](http://localhost:3000/)
+
+---
+
+## 🏢 Sobre a AI Atende
+
+A **AI Atende** desenvolve soluções de **automação, monitoramento e inteligência operacional**, integrando **IA + atendimento humano** em escala.
+
+---
+
+## 📄 Licença
+
+Projeto de uso interno da **AI Atende**.

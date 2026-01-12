@@ -3,41 +3,24 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 
-/**
- * Servidor de Socket Independente
- * Responsável por distribuir mensagens em tempo real sem sobrecarregar a API principal.
- * Utiliza o conceito de 'Rooms' para segmentar o tráfego de dados.
- */
-
 const app = express();
-app.use(cors({ origin: "*" })); // Permite que o Front-end e o Webhook acessem o servidor
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-/**
- * GESTÃO DE CONEXÕES E SALAS (ROOMS)
- */
 io.on("connection", (socket) => {
   console.log(`[SOCKET CONNECTED] Client ID: ${socket.id}`);
 
-  /**
-   * Sala de Conversa Específica:
-   * Usada quando um atendente abre um chat individual.
-   * Garante que mensagens de 'João' não apareçam na tela da 'Maria'.
-   */
+  // 1. Join por Conversa (Já existia)
   socket.on("join_conversation", (conversationId: string) => {
     if (!conversationId) return;
     socket.join(conversationId);
     console.log(`[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`);
   });
 
-  /**
-   * Sala de Canal (Inbox):
-   * Usada pelo Dashboard principal para monitorar TUDO de um departamento.
-   * Ex: Quem entrar na sala 'inbox_3' verá todas as mensagens do Operacional.
-   */
+  // 2. NOVO: Join por Inbox (Para o Dashboard filtrar o canal todo)
   socket.on("join_inbox", (inboxId: string) => {
     if (!inboxId) return;
     socket.join(`inbox_${inboxId}`);
@@ -49,27 +32,23 @@ io.on("connection", (socket) => {
   });
 });
 
-/**
- * ENDPOINT DE EMISSÃO (PONTE WEBHOOK -> CLIENTE)
- * O Webhook do Next.js faz um POST aqui para "avisar" que chegou algo novo.
- */
+app.get("/health", (_, res) => res.json({ ok: true }));
+
+// 3. Recebe mensagem do webhook e emite para as salas certas
 app.post("/emit-message", (req, res) => {
   const message = req.body;
 
-  // Validação de Integridade: Impede que lixo seja enviado para os clientes
   if (!message?.id || !message?.content || !message?.conversationId) {
     return res.status(400).json({ error: "Invalid message payload" });
   }
 
-  console.log(`[EMIT] Msg ${message.id} -> Conv: ${message.conversationId} | Inbox: ${message.inboxId}`);
+  console.log(`[EMIT] Msg ${message.id} to Conv: ${message.conversationId} and Inbox: ${message.inboxId}`);
 
-  /**
-   * DISPARO DUPLO (Double Emission):
-   * 1. Enviamos para a sala da conversa (quem está lendo o chat agora).
-   * 2. Enviamos para a sala do inbox (quem está olhando a lista de conversas no dashboard).
-   */
+  // Emite para quem está ouvindo a conversa específica
   io.to(message.conversationId).emit("new_message", message);
 
+  // Emite para quem está ouvindo o canal (Operacional ou Comercial)
+  // Isso garante que se uma conversa nova surgir, o dashboard do canal certo a receba
   if (message.inboxId) {
     io.to(`inbox_${message.inboxId}`).emit("new_message", message);
   }
@@ -77,10 +56,5 @@ app.post("/emit-message", (req, res) => {
   return res.json({ ok: true });
 });
 
-app.get("/health", (_, res) => res.json({ ok: true }));
-
 const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
-  console.log(`--- ✅ SERVIDOR DE SOCKET ATIVO ---`);
-  console.log(`[SERVER] Rodando na porta ${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`[SERVER] Socket server running on port ${PORT}`));
