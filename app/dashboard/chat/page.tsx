@@ -8,11 +8,14 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Contact { id: string; name: string; }
+
+// 1. Atualizado para incluir senderName e alinhar com o Banco/Zustand
 interface Message {
   id: string;
-  chatwootMessageId: string;
+  chatwootMessageId?: string;
   content: string;
   sender: "USER" | "AGENT" | "BOT";
+  senderName?: string;
   isRead: boolean;
   conversationId: string;
   contact: Contact;
@@ -24,7 +27,7 @@ export default function QueueDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
 
-  // 1. Persistência dos Pins no LocalStorage
+  // 1. Persistência dos Pins (Mantido)
   useEffect(() => {
     const saved = localStorage.getItem("pinned_conversations");
     if (saved) setPinnedIds(JSON.parse(saved));
@@ -42,7 +45,7 @@ export default function QueueDashboard() {
     );
   };
 
-  // 2. Ordenação: Primeiro PINADOS, depois por DATA RECENTE
+  // 2. Ordenação (Mantido)
   const sortedConversations = useMemo(() => {
     const grouped = messages.reduce<Record<string, Message[]>>((acc, msg) => {
       if (!acc[msg.conversationId]) acc[msg.conversationId] = [];
@@ -111,7 +114,7 @@ export default function QueueDashboard() {
 
   return (
     <div className="w-full h-screen bg-[#0f1115] text-white flex flex-col p-4 font-sans overflow-hidden">
-      {/* HEADER */}
+      {/* HEADER (Mantido) */}
       <header className="flex justify-between items-center mb-4 shrink-0 h-12">
         <div className="flex items-center gap-3">
           <span className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-300">
@@ -150,7 +153,7 @@ export default function QueueDashboard() {
                   isPinned ? "border-blue-500/50 ring-1 ring-blue-500/20" : "border-gray-800 hover:border-gray-700"
                 }`}
               >
-                {/* CARD HEADER COM PIN */}
+                {/* CARD HEADER (Mantido) */}
                 <div className={`p-3 border-b flex justify-between items-center rounded-t-lg ${isPinned ? "bg-[#1c222c]" : "bg-[#1e2128]"} border-gray-800`}>
                   <div className="flex items-center gap-2 truncate max-w-[80%]">
                     <button 
@@ -168,14 +171,18 @@ export default function QueueDashboard() {
                   </span>
                 </div>
 
-                {/* MENSAGENS */}
+                {/* MENSAGENS - AJUSTADO PARA EXIBIR SENDERNAME */}
                 <div className="flex-1 p-2 flex flex-col justify-end space-y-2 overflow-hidden bg-gradient-to-b from-transparent to-[#0f1115]/20">
                   {recentMsgs.map((msg) => (
                     <div key={msg.id} className="flex gap-2 items-start text-xs">
                       <div className="mt-0.5 opacity-70 shrink-0">{getIcon(msg.sender)}</div>
                       <div className="flex-1 min-w-0">
                         <p className={`line-clamp-2 ${msg.sender === 'AGENT' ? 'text-purple-300' : 'text-gray-300'}`}>
-                          <span className="font-bold opacity-50">{msg.sender === 'AGENT' ? 'Team' : 'User'}:</span> {msg.content}
+                          <span className="font-bold opacity-60">
+                            {/* Se for AGENT e tiver nome, mostra o nome (Paulo César). Senão, fallback para Team/User */}
+                            {msg.sender === 'AGENT' ? (msg.senderName || 'Team') : 'User'}:
+                          </span>{" "}
+                          <span className="text-gray-400 font-light">{msg.content}</span>
                         </p>
                         <span className="text-[10px] text-gray-600">
                           {formatDistanceToNow(new Date(msg.createdAt), { locale: ptBR, addSuffix: true })}

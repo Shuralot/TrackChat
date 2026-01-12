@@ -1,37 +1,31 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
 export async function POST(req: Request) {
   const payload = await req.json();
-  console.log(payload)
+
   if (payload.event !== "message_created") return NextResponse.json({ ok: true });
 
-  //Filtro de canais
   const allowedInboxIds = 3;
   if (payload.inbox && payload.inbox.id !== allowedInboxIds) {
-    console.log("Inbox não permitido:", payload.inbox.id);
-    return NextResponse.json({ ok: true, status:"ignored_inbox" });
+    return NextResponse.json({ ok: true, status: "ignored_inbox" });
   }
 
-
-  // No payload que você recebeu, a mensagem é o payload inteiro
   const msgPayload = payload;
+  if (!msgPayload || !msgPayload.sender) return NextResponse.json({ ok: false });
 
-  if (!msgPayload || !msgPayload.sender) {
-    console.error("Payload inválido:", payload);
-    return NextResponse.json({ ok: false, error: "Mensagem sem sender" });
-  }
-
-  const sender = msgPayload.sender;
+  // Nome do Agente ou Usuário vindo do Chatwoot
+  const currentSenderName = msgPayload.sender.name;
 
   // 1️⃣ Upsert do contato
   const contact = await prisma.contact.upsert({
-    where: { chatwootContactId: sender.id.toString() },
-    update: { name: sender.name, email: sender.email },
+    where: { chatwootContactId: msgPayload.sender.id.toString() },
+    update: { name: currentSenderName, email: msgPayload.sender.email },
     create: {
-      chatwootContactId: sender.id.toString(),
-      name: sender.name,
-      email: sender.email,
-      avatar: sender.avatar || "",
+      chatwootContactId: msgPayload.sender.id.toString(),
+      name: currentSenderName,
+      email: msgPayload.sender.email,
+      avatar: msgPayload.sender.avatar || "",
     },
   });
 
@@ -53,13 +47,14 @@ export async function POST(req: Request) {
     },
   });
 
-  // 3️⃣ Upsert da mensagem
+  // 3️⃣ Upsert da mensagem (AGORA COM SENDERNAME)
   const message = await prisma.message.upsert({
     where: { chatwootMessageId: msgPayload.id.toString() },
     update: {},
     create: {
       chatwootMessageId: msgPayload.id.toString(),
       content: msgPayload.content,
+      senderName: currentSenderName,
       sender:
         msgPayload.message_type === "incoming"
           ? "USER"
@@ -79,17 +74,16 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: message.id,
-        chatwootMessageId: message.chatwootMessageId,
         content: message.content,
         sender: message.sender,
-        isRead: message.isRead,
+        senderName: currentSenderName, // Envia Paulo César para o Front
         conversationId: conversation.id,
         contact: { id: contact.id, name: contact.name },
         createdAt: message.createdAt,
       }),
     });
   } catch (err) {
-    console.error("Failed to emit message to socket server", err);
+    console.error("Socket emit failed", err);
   }
 
   return NextResponse.json({ ok: true });

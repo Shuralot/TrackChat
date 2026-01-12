@@ -35,6 +35,7 @@ model Message {
   id                String       @id @default(uuid())
   chatwootMessageId String       @unique
   content           String
+  senderName        String?
   sender            SenderType
   isRead            Boolean      @default(false)
   conversationId    String

@@ -20,6 +20,7 @@ export async function GET() {
     content: msg.content,
     sender: msg.sender,
     isRead: msg.isRead,
+    senderName: msg.senderName,
     conversationId: msg.conversationId,
     contact: msg.conversation?.contact
       ? { id: msg.conversation.contact.id, name: msg.conversation.contact.name }
