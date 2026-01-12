@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
 import { Clock, MessageSquare, Lock, CircleUser, Pin, Settings2 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Contact { id: string; name: string; }
@@ -17,7 +17,7 @@ interface Message {
   senderName?: string;
   isRead: boolean;
   conversationId: string;
-  contact: Contact; // Obrigatório para evitar erros de undefined
+  contact: Contact;
   createdAt: string;
   inboxId?: number; 
 }
@@ -46,6 +46,11 @@ export default function QueueDashboard() {
   useEffect(() => {
     localStorage.setItem("pinned_conversations", JSON.stringify(pinnedIds));
   }, [pinnedIds]);
+
+  // CALCULO DO TOTAL DIÁRIO
+  const dailyTotal = useMemo(() => {
+    return messages.filter(msg => isToday(new Date(msg.createdAt))).length;
+  }, [messages]);
 
   const handleSelectInbox = (id: number) => {
     localStorage.setItem("selected_inbox_id", id.toString());
@@ -89,7 +94,6 @@ export default function QueueDashboard() {
     
     socket.on("connect", () => {
       setIsConnected(true);
-      // AJUSTE: Entra na sala do Inbox selecionado para tempo real focado
       socket.emit("join_inbox", selectedInbox.toString());
     });
 
@@ -109,24 +113,23 @@ export default function QueueDashboard() {
       });
 
     const handleNewMessage = (message: Message) => {
-      // FILTRO DE SEGURANÇA: Só processa se a mensagem for do inbox selecionado
-      if (message.inboxId && Number(message.inboxId) !== selectedInbox) {
-        return;
-      }
+      if (message.inboxId && Number(message.inboxId) !== selectedInbox) return;
 
       joinConversation(message.conversationId);
       addMessage(message);
       
+      // AJUSTE NO SOM
       if (document.visibilityState === "visible") {
-        new Audio("/notification.mp3").play().catch(() => {});
+        // Caminho correto: Remove o "./public" e inicia com "/"
+        const audio = new Audio("/sounds/notification.mp3");
+        audio.currentTime = 0; // Reseta o áudio se ele já estiver tocando
+        audio.play().catch(err => console.warn("Navegador bloqueou autoplay do som."));
       }
     };
 
     socket.on("new_message", handleNewMessage);
     return () => {
       socket.off("new_message", handleNewMessage);
-      socket.off("connect");
-      socket.off("disconnect");
     };
   }, [selectedInbox, addMessage, setMessages]);
 
@@ -146,13 +149,16 @@ export default function QueueDashboard() {
           <span className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-300">
             Ai Atende
           </span>
+          <span className="text-xl font-extrabold text-white">
+          | TrackChat
+          </span>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-[#1e2128] hover:bg-[#2a2e37] px-3 py-1 rounded border border-gray-700 transition-colors"
+            className="ml-4 flex items-center gap-2 bg-[#1e2128] hover:bg-[#2a2e37] px-3 py-1 rounded border border-gray-700 transition-colors"
           >
             <Settings2 size={16} className="text-blue-400" />
             <span className="text-sm font-bold text-gray-200 uppercase tracking-wider">
-              {selectedInbox === 3 ? "Operacional" : selectedInbox === 4 ? "Comercial" : "Selecionar Filtro"}
+              {selectedInbox === 3 ? "Operacional" : selectedInbox === 2 ? "Comercial" : "Selecionar Filtro"}
             </span>
           </button>
         </div>
@@ -163,7 +169,7 @@ export default function QueueDashboard() {
           </div>
           <div className="flex items-center gap-2 bg-[#1e2128] px-3 py-1 rounded border border-gray-800 text-sm">
             <Clock className="w-4 h-4 text-blue-500" />
-            Total: <b className="text-white">{messages.length}</b>
+            Hoje: <b className="text-white">{dailyTotal}</b>
           </div>
           <div className="flex items-center gap-2 bg-[#1e2128] px-3 py-1 rounded border border-gray-800 text-sm">
             <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
@@ -188,9 +194,6 @@ export default function QueueDashboard() {
                     </button>
                     <h3 className="font-semibold text-sm truncate" title={contactName}>{contactName}</h3>
                   </div>
-                  <span className="text-[10px] text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded italic">
-                    {allMsgs.length} msgs
-                  </span>
                 </div>
 
                 <div className="flex-1 p-2 flex flex-col justify-end space-y-2 overflow-hidden bg-gradient-to-b from-transparent to-[#0f1115]/20">
@@ -235,15 +238,17 @@ export default function QueueDashboard() {
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center justify-between ${selectedInbox === 3 ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 hover:border-gray-700 bg-[#1e2128]'}`}
               >
                 <div>
+                  <div className="font-bold text-white uppercase text-[10px] tracking-widest opacity-50">Canal 03</div>
                   <div className="text-lg font-black text-blue-400 uppercase">Operacional</div>
                 </div>
               </button>
 
               <button
-                onClick={() => handleSelectInbox(4)}
+                onClick={() => handleSelectInbox(2)}
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center justify-between ${selectedInbox === 2 ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800 hover:border-gray-700 bg-[#1e2128]'}`}
               >
                 <div>
+                  <div className="font-bold text-white uppercase text-[10px] tracking-widest opacity-50">Canal 02</div>
                   <div className="text-lg font-black text-purple-400 uppercase">Comercial</div>
                 </div>
               </button>
