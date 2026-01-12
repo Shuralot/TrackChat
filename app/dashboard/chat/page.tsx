@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getSocket } from "@/lib/socket";
 import { useChatStore } from "@/store/chatStore";
-import { 
-  AlertTriangle, Clock, Zap, Users, MessageSquare, 
-  Search, Bell, Headphones, Lock 
-} from "lucide-react";
+import { Clock, MessageSquare, Lock, CircleUser, Pin } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -24,155 +21,173 @@ interface Message {
 
 export default function QueueDashboard() {
   const { messages, setMessages, addMessage } = useChatStore();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
 
-  // Agrupa mensagens por conversa
-  const conversationsGrouped = messages.reduce<Record<string, Message[]>>((acc, msg) => {
-    if (!acc[msg.conversationId]) acc[msg.conversationId] = [];
-    acc[msg.conversationId].push(msg);
-    return acc;
-  }, {});
-
-  const unansweredCount = messages.filter(m => !m.isRead).length;
+  // 1. Persistência dos Pins no LocalStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("pinned_conversations");
+    if (saved) setPinnedIds(JSON.parse(saved));
+  }, []);
 
   useEffect(() => {
-    const socket = getSocket();
+    localStorage.setItem("pinned_conversations", JSON.stringify(pinnedIds));
+  }, [pinnedIds]);
 
-    // Função para entrar em uma conversa
+  const togglePin = (conversationId: string) => {
+    setPinnedIds(prev => 
+      prev.includes(conversationId) 
+        ? prev.filter(id => id !== conversationId) 
+        : [...prev, conversationId]
+    );
+  };
+
+  // 2. Ordenação: Primeiro PINADOS, depois por DATA RECENTE
+  const sortedConversations = useMemo(() => {
+    const grouped = messages.reduce<Record<string, Message[]>>((acc, msg) => {
+      if (!acc[msg.conversationId]) acc[msg.conversationId] = [];
+      acc[msg.conversationId].push(msg);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped).sort(([idA, msgsA], [idB, msgsB]) => {
+      const isPinnedA = pinnedIds.includes(idA);
+      const isPinnedB = pinnedIds.includes(idB);
+
+      if (isPinnedA && !isPinnedB) return -1;
+      if (!isPinnedA && isPinnedB) return 1;
+
+      const lastA = new Date(msgsA[msgsA.length - 1].createdAt).getTime();
+      const lastB = new Date(msgsB[msgsB.length - 1].createdAt).getTime();
+      return lastB - lastA;
+    });
+  }, [messages, pinnedIds]);
+
+  const todayDate = new Date().toLocaleDateString("pt-BR");
+
+  // 3. Socket e Handlers
+  useEffect(() => {
+    const socket = getSocket();
+    
+    socket.on("connect", () => setIsConnected(true));
+    socket.on("disconnect", () => setIsConnected(false));
+
     const joinConversation = (conversationId: string) => {
       if (!conversationId) return;
       socket.emit("join_conversation", conversationId);
     };
 
-    // Buscar mensagens iniciais
     fetch("/api/messages")
       .then(res => res.json())
       .then((msgs: Message[]) => {
         setMessages(msgs);
-        // Entrar em todas as salas já existentes
         const allConversationIds = Array.from(new Set(msgs.map(m => m.conversationId)));
         allConversationIds.forEach(joinConversation);
       });
 
-    // Receber mensagens novas
     const handleNewMessage = (message: Message) => {
-      // Entrar na sala se ainda não estiver
       joinConversation(message.conversationId);
-
-      // Adicionar a mensagem
       addMessage(message);
-
-      // Tocar áudio se o usuário estiver ativo na página
       if (document.visibilityState === "visible") {
-        new Audio("/notification.mp3").play().catch(() => {
-          console.warn("Não foi possível tocar o áudio de notificação");
-        });
+        new Audio("/notification.mp3").play().catch(() => {});
       }
     };
 
     socket.on("new_message", handleNewMessage);
-
     return () => {
       socket.off("new_message", handleNewMessage);
+      socket.off("connect");
+      socket.off("disconnect");
     };
   }, [addMessage, setMessages]);
 
-  // Scroll automático
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   const getIcon = (sender: Message["sender"]) => {
     switch (sender) {
-      case "AGENT": return <Headphones size={18} />;
-      case "USER": return <MessageSquare size={18} />;
-      default: return <Lock size={18} />;
+      case "AGENT": return <CircleUser size={14} className="text-purple-400" />;
+      case "USER": return <MessageSquare size={14} className="text-green-400" />;
+      default: return <Lock size={14} className="text-gray-500" />;
     }
   };
 
-  const getStatusColor = (isRead: boolean) =>
-    isRead ? "bg-blue-500 text-blue-500" : "bg-red-500 text-red-500";
-
   return (
-    <div className="w-full h-screen bg-[#0f1115] text-white flex flex-col p-6 font-sans overflow-hidden">
+    <div className="w-full h-screen bg-[#0f1115] text-white flex flex-col p-4 font-sans overflow-hidden">
       {/* HEADER */}
-      <header className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">Ai Atende</span>
-          <h1 className="text-xl font-semibold text-gray-200">Track Chat</h1>
-        </div>  
+      <header className="flex justify-between items-center mb-4 shrink-0 h-12">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-300">
+            Ai Atende
+          </span>
+          <span className="text-lg font-semibold text-gray-300">| TrackChat</span>
+        </div>
+
+        <div className="flex gap-4">
+          <div className="flex items-center gap-2 bg-[#1e2128] px-3 py-1 rounded border border-gray-800 text-sm">
+            Data: <b className="text-white">{todayDate}</b>
+          </div>
+          <div className="flex items-center gap-2 bg-[#1e2128] px-3 py-1 rounded border border-gray-800 text-sm">
+            <Clock className="w-4 h-4 text-blue-500" />
+            Total: <b className="text-white">{messages.length}</b>
+          </div>
+          <div className="flex items-center gap-2 bg-[#1e2128] px-3 py-1 rounded border border-gray-800 text-sm">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+            <span className={isConnected ? "text-green-400" : "text-red-400"}>{isConnected ? "Conectado" : "Desconectado"}</span>
+          </div>
+        </div>
       </header>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#d32f2f] rounded-lg p-4 flex justify-between items-center shadow-lg">
-          <div>
-            <p className="text-xs font-bold uppercase opacity-80 mb-1">Aguardando Resposta:</p>
-            <h2 className="text-4xl font-bold">{unansweredCount}</h2>
-          </div>
-          <AlertTriangle className="w-8 h-8 opacity-50" />
-        </div>
-        <div className="bg-[#1e2128] border border-gray-800 rounded-lg p-4 flex justify-between items-center">
-          <div>
-            <p className="text-xs font-bold uppercase text-gray-400 mb-1">Total de Mensagens:</p>
-            <h2 className="text-3xl font-mono font-bold">{messages.length}</h2>
-          </div>
-          <Clock className="w-6 h-6 text-gray-500" />
-        </div>
-        <div className="bg-[#10b981] rounded-lg p-4 flex justify-between items-center">
-          <div>
-            <p className="text-xs font-bold uppercase opacity-80 mb-1">Status do Sistema:</p>
-            <h2 className="text-3xl font-mono font-bold">Online</h2>
-          </div>
-          <Zap className="w-6 h-6 text-yellow-300 fill-current" />
-        </div>
-        <div className="bg-[#0f4c75] rounded-lg p-4 flex justify-between items-center">
-          <div>
-            <p className="text-xs font-bold uppercase opacity-80 mb-1">Operadores:</p>
-            <h2 className="text-3xl font-bold">Ativo</h2>
-          </div>
-          <Users className="w-8 h-8 opacity-60" />
-        </div>
-      </div>
+      {/* GRID */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 pb-4">
+          {sortedConversations.map(([convoId, allMsgs]) => {
+            const contactName = allMsgs[0]?.contact?.name || "Desconhecido";
+            const recentMsgs = allMsgs.slice(-6);
+            const isPinned = pinnedIds.includes(convoId);
 
-      {/* QUEUE LIST */}
-      <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
-        {Object.entries(conversationsGrouped).map(([convoId, msgs]) => {
-          const contactName = msgs[0]?.contact?.name || "Sem Contato";
-          const unreadCount = msgs.filter(m => !m.isRead).length;
-
-          return (
-            <div key={convoId} className="border border-gray-800 rounded-lg p-4 bg-[#1e2128]">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold">{contactName}</h3>
-                {unreadCount > 0 && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-red-900/30 text-red-400 border border-red-800/50">
-                    {unreadCount} Não Lida
+            return (
+              <div 
+                key={convoId} 
+                className={`bg-[#16181d] border rounded-lg flex flex-col h-[320px] shadow-sm transition-all duration-300 ${
+                  isPinned ? "border-blue-500/50 ring-1 ring-blue-500/20" : "border-gray-800 hover:border-gray-700"
+                }`}
+              >
+                {/* CARD HEADER COM PIN */}
+                <div className={`p-3 border-b flex justify-between items-center rounded-t-lg ${isPinned ? "bg-[#1c222c]" : "bg-[#1e2128]"} border-gray-800`}>
+                  <div className="flex items-center gap-2 truncate max-w-[80%]">
+                    <button 
+                      onClick={() => togglePin(convoId)}
+                      className={`shrink-0 transition-colors ${isPinned ? "text-blue-400" : "text-gray-600 hover:text-gray-400"}`}
+                    >
+                      <Pin size={14} fill={isPinned ? "currentColor" : "none"} />
+                    </button>
+                    <h3 className="font-semibold text-sm truncate" title={contactName}>
+                      {contactName}
+                    </h3>
+                  </div>
+                  <span className="text-[10px] text-gray-500 bg-gray-900 px-1.5 py-0.5 rounded italic">
+                    {allMsgs.length} msgs
                   </span>
-                )}
-              </div>
-              {msgs.map(msg => (
-                <div key={msg.id} className="flex items-center gap-3 mb-2 p-2 rounded hover:bg-[#252830] transition-colors border-l-4 border-transparent relative overflow-hidden">
-                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${getStatusColor(msg.isRead).split(' ')[0]}`}></div>
-                  <div className={`p-2 rounded-full bg-opacity-10 ${getStatusColor(msg.isRead)}`}>
-                    {getIcon(msg.sender)}
-                  </div>
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-gray-400 text-xs">ID: {msg.chatwootMessageId?.slice(0,8)}</span>
-                      <span className="text-gray-600">|</span>
-                      <span className={`text-sm font-bold ${!msg.isRead ? 'text-orange-400' : 'text-gray-300'}`}>
-                        HÁ: {formatDistanceToNow(new Date(msg.createdAt), { locale: ptBR })}
-                      </span>
-                    </div>
-                    <div className="text-gray-400 italic">{msg.sender}: "{msg.content}"</div>
-                  </div>
                 </div>
-              ))}
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
+
+                {/* MENSAGENS */}
+                <div className="flex-1 p-2 flex flex-col justify-end space-y-2 overflow-hidden bg-gradient-to-b from-transparent to-[#0f1115]/20">
+                  {recentMsgs.map((msg) => (
+                    <div key={msg.id} className="flex gap-2 items-start text-xs">
+                      <div className="mt-0.5 opacity-70 shrink-0">{getIcon(msg.sender)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`line-clamp-2 ${msg.sender === 'AGENT' ? 'text-purple-300' : 'text-gray-300'}`}>
+                          <span className="font-bold opacity-50">{msg.sender === 'AGENT' ? 'Team' : 'User'}:</span> {msg.content}
+                        </p>
+                        <span className="text-[10px] text-gray-600">
+                          {formatDistanceToNow(new Date(msg.createdAt), { locale: ptBR, addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

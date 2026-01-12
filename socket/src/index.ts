@@ -25,6 +25,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`[SOCKET DISCONNECTED] Client ID: ${socket.id}`);
+
   });
 });
 

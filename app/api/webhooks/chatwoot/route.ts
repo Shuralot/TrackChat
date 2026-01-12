@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 export async function POST(req: Request) {
   const payload = await req.json();
-
+  console.log(payload)
   if (payload.event !== "message_created") return NextResponse.json({ ok: true });
+
+  //Filtro de canais
+  const allowedInboxIds = 3;
+  if (payload.inbox && payload.inbox.id !== allowedInboxIds) {
+    console.log("Inbox não permitido:", payload.inbox.id);
+    return NextResponse.json({ ok: true, status:"ignored_inbox" });
+  }
+
 
   // No payload que você recebeu, a mensagem é o payload inteiro
   const msgPayload = payload;
