@@ -18,6 +18,7 @@ model Conversation {
   updatedAt              DateTime  @updatedAt
   contact                Contact?  @relation(fields: [contactId], references: [id])
   messages               Message[]
+  chatwootInboxId        String?
 }
 
 model Contact {

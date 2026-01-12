@@ -6,15 +6,18 @@ export async function POST(req: Request) {
 
   if (payload.event !== "message_created") return NextResponse.json({ ok: true });
 
-  const allowedInboxIds = 3;
-  if (payload.inbox && payload.inbox.id !== allowedInboxIds) {
+  // 1️⃣ Ajuste no Filtro: Agora aceitamos 3 (Operacional) e 4 (Comercial)
+  const allowedInboxes = [3, 2];
+  const currentInboxId = payload.inbox?.id;
+
+  if (!allowedInboxes.includes(currentInboxId)) {
+    console.log("Inbox ignorado:", currentInboxId);
     return NextResponse.json({ ok: true, status: "ignored_inbox" });
   }
 
   const msgPayload = payload;
   if (!msgPayload || !msgPayload.sender) return NextResponse.json({ ok: false });
 
-  // Nome do Agente ou Usuário vindo do Chatwoot
   const currentSenderName = msgPayload.sender.name;
 
   // 1️⃣ Upsert do contato
@@ -29,7 +32,7 @@ export async function POST(req: Request) {
     },
   });
 
-  // 2️⃣ Upsert da conversa
+  // 2️⃣ Upsert da conversa (SALVANDO O INBOX_ID)
   const conversation = await prisma.conversation.upsert({
     where: { chatwootConversationId: msgPayload.conversation.id.toString() },
     update: {
@@ -37,6 +40,7 @@ export async function POST(req: Request) {
       lastMessageAt: new Date(msgPayload.created_at),
       contactId: contact.id,
       status: msgPayload.conversation.status || "open",
+      chatwootInboxId: currentInboxId.toString(),
     },
     create: {
       chatwootConversationId: msgPayload.conversation.id.toString(),
@@ -44,10 +48,11 @@ export async function POST(req: Request) {
       lastMessageAt: new Date(msgPayload.created_at),
       contactId: contact.id,
       status: msgPayload.conversation.status || "open",
+      chatwootInboxId: currentInboxId.toString(),
     },
   });
 
-  // 3️⃣ Upsert da mensagem (AGORA COM SENDERNAME)
+  // 3️⃣ Upsert da mensagem
   const message = await prisma.message.upsert({
     where: { chatwootMessageId: msgPayload.id.toString() },
     update: {},
@@ -76,8 +81,9 @@ export async function POST(req: Request) {
         id: message.id,
         content: message.content,
         sender: message.sender,
-        senderName: currentSenderName, // Envia Paulo César para o Front
+        senderName: currentSenderName,
         conversationId: conversation.id,
+        inboxId: currentInboxId, // 👈 Importante para o Front saber de qual canal é
         contact: { id: contact.id, name: contact.name },
         createdAt: message.createdAt,
       }),

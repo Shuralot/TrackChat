@@ -2,9 +2,19 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: Request) {
+  // 1. Captura o inboxId da URL (ex: /api/messages?inboxId=3)
+  const { searchParams } = new URL(req.url);
+  const inboxId = searchParams.get("inboxId");
+
   const messages = await prisma.message.findMany({
-    orderBy: { createdAt: "asc" }, // do mais antigo para o mais recente
+    // 2. Filtra as mensagens pelo inboxId da conversa vinculada
+    where: inboxId ? {
+      conversation: {
+        chatwootInboxId: inboxId // Filtra pelo ID do canal (3 ou 4)
+      }
+    } : {}, 
+    orderBy: { createdAt: "asc" },
     include: {
       conversation: {
         include: {
