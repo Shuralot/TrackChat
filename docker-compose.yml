@@ -1,29 +1,26 @@
 services:
   app:
-    build: .
-    ports:
-      - "3000:3000"
+    build:
+      context: .
+      args:
+        # Resolve a interpolação ${DOMAIN} antes de enviar ao Dockerfile
+        - NEXT_PUBLIC_SOCKET_URL=http://${DOMAIN}:4000
     env_file:
       - .env
+    ports:
+      - "3000:3000"
     depends_on:
       - db
+      - socket
+    networks:
+      - trackchat-network
 
   socket:
     build: ./socket
+    env_file:
+      - .env
     ports:
       - "4000:4000"
-    restart: always
-
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: trackchat
-      POSTGRES_PASSWORD: trackchat
-      POSTGRES_DB: trackchat
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-volumes:
-  pgdata:
+    networks:
+      - trackchat-network
+# ... restante do arquivo (db, volumes, networks)

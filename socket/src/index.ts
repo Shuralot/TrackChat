@@ -4,31 +4,37 @@ import { Server } from "socket.io";
 import cors from "cors";
 
 const app = express();
-app.use(cors({ origin: "*" }));
+
+// Pega o domínio da ENV para o CORS, se não existir usa o wildcard
+const allowedOrigin = process.env.DOMAIN ? `http://${process.env.DOMAIN}:3000` : "*";
+
+app.use(cors({ origin: "*" })); // Webhooks geralmente não precisam de restrição de CORS
 app.use(express.json());
 
 const httpServer = createServer(app);
-const io = new Server(httpServer, { cors: { origin: "*" } });
+
+// Configuração do Socket.io com suporte a Long Polling e WebSockets
+const io = new Server(httpServer, {
+  cors: {
+    origin: [allowedOrigin, "http://localhost:3000"], // Permite o domínio real e local para testes
+    methods: ["GET", "POST"]
+  },
+  transports: ["websocket", "polling"] // Garante compatibilidade
+});
 
 io.on("connection", (socket) => {
   console.log(`[SOCKET CONNECTED] Client ID: ${socket.id}`);
 
-  // Join por Conversa (grupo)
   socket.on("join_conversation", (conversationId: string) => {
     if (!conversationId) return;
-    socket.join(conversationId);
-    console.log(
-      `[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`
-    );
+    socket.join(conversationId.toString());
+    console.log(`[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`);
   });
 
-  // Join por Inbox (canal)
   socket.on("join_inbox", (inboxId: string) => {
     if (!inboxId) return;
     socket.join(`inbox_${inboxId}`);
-    console.log(
-      `[JOIN INBOX] Socket ${socket.id} -> Room: inbox_${inboxId}`
-    );
+    console.log(`[JOIN INBOX] Socket ${socket.id} -> Room: inbox_${inboxId}`);
   });
 
   socket.on("disconnect", () => {
@@ -36,48 +42,29 @@ io.on("connection", (socket) => {
   });
 });
 
-app.get("/health", (_, res) => res.json({ ok: true }));
+app.get("/health", (_, res) => res.json({ ok: true, domain: process.env.DOMAIN }));
 
-// Recebe mensagem do webhook e emite para as salas certas
 app.post("/emit-message", (req, res) => {
   const {
-    id,
-    content,
-    sender,
-    senderName,
-    senderPhone,
-    conversationId,
-    inboxId,
-    groupName,
-    createdAt,
+    id, content, sender, senderName, senderPhone,
+    conversationId, inboxId, groupName, createdAt,
   } = req.body;
 
-  // Validação mínima
   if (!id || !content || !conversationId) {
     return res.status(400).json({ error: "Invalid message payload" });
   }
 
-  // Payload PADRÃO para o front
   const socketPayload = {
-    id,
-    content,
-    sender,
-    senderName,
-    senderPhone,
-    conversationId,
-    inboxId,
-    groupName,
-    createdAt,
+    id, content, sender, senderName, senderPhone,
+    conversationId: conversationId.toString(),
+    inboxId, groupName, createdAt,
   };
 
-  console.log(
-    `[EMIT] Msg ${id} | Group: ${groupName} | From: ${senderName} (${senderPhone})`
-  );
+  console.log(`[EMIT] Msg ${id} | Room: ${conversationId} | From: ${senderName}`);
 
-  // Emite para a conversa (grupo específico)
-  io.to(conversationId).emit("new_message", socketPayload);
+  // IMPORTANTE: Garantir que conversationId seja string para o io.to()
+  io.to(conversationId.toString()).emit("new_message", socketPayload);
 
-  // Emite para o inbox (canal inteiro)
   if (inboxId) {
     io.to(`inbox_${inboxId}`).emit("new_message", socketPayload);
   }

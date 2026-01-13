@@ -1,4 +1,5 @@
 DATABASE_URL=postgresql://trackchat:trackchat@db:5432/trackchat
+
 NODE_ENV=development
 
 # Para o frontend (socket.io-client no navegador)
