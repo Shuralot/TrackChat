@@ -1,9 +1,14 @@
-DATABASE_URL=postgresql://trackchat:trackchat@db:5432/trackchat
+# Rede
+EXTERNAL_HOST=localhost # Na VPS, mude para o IP ou domínio
+PORT_APP=6666
+PORT_SOCKET=7777
 
-NODE_ENV=development
+# Banco
+POSTGRES_USER=Batata
+POSTGRES_PASSWORD=Batata26
+POSTGRES_DB=BatataDB
+DATABASE_URL=postgresql://Batata:Batata26@db:5432/BatataDB
 
-# Para o frontend (socket.io-client no navegador)
-NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
-
-# Para o backend (webhook envia POST para o Socket Server)
-SOCKET_SERVER_URL=http://socket:4000
+# URLs
+NEXT_PUBLIC_SOCKET_URL=http://${EXTERNAL_HOST}:${PORT_SOCKET}
+SOCKET_SERVER_INTERNAL_URL=http://socket:4000

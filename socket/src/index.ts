@@ -15,6 +15,7 @@ const allowedOrigins = [
   `http://${EXTERNAL_HOST}:3000`,
   "http://localhost:3000",
   "http://localhost:1700",
+  "179.73.180.164"
 ];
 
 // Middleware de CORS para as rotas HTTP (como o /emit-message)
