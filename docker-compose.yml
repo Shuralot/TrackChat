@@ -3,12 +3,12 @@ services:
     build:
       context: .
       args:
-        # Resolve a interpolação ${DOMAIN} antes de enviar ao Dockerfile
-        - NEXT_PUBLIC_SOCKET_URL=http://${DOMAIN}:4000
+        # IMPORTANTE: Agora aponta para a porta externa 1750 do socket
+        - NEXT_PUBLIC_SOCKET_URL=http://${DOMAIN}:1701
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "1700:3000" # Acessa no navegador por :1700, mas o Next roda na 3000 interna
     depends_on:
       - db
       - socket
@@ -20,7 +20,30 @@ services:
     env_file:
       - .env
     environment:
-      - DOMAIN=${DOMAIN} # Força a passagem da variável
+      - DOMAIN=${DOMAIN}
+      - PORT=4000 # Porta interna que o código do socket escuta
     ports:
-      - "4000:4000"
+      - "1701:4000" # Acessa externamente por :1750
     restart: always
+    networks:
+      - trackchat-network
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: trackchat
+      POSTGRES_PASSWORD: trackchat
+      POSTGRES_DB: trackchat
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "1750:5432" # Mantive a padrão do banco, a menos que queira mudar também
+    networks:
+      - trackchat-network
+
+networks:
+  trackchat-network:
+    driver: bridge
+
+volumes:
+  pgdata:
