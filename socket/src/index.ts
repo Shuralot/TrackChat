@@ -5,44 +5,63 @@ import cors from "cors";
 
 const app = express();
 
-// Pega o domínio da ENV para o CORS, se não existir usa o wildcard
-const allowedOrigin = process.env.DOMAIN ? `http://${process.env.DOMAIN}:3000` : "*";
+// 1. Configuração de Origens (Versatilidade Local vs VPS)
+const allowedOrigins = [
+  // O que vem do seu .env (ex: http://localhost:1700 ou http://seu-ip:1700)
+  `http://${process.env.EXTERNAL_HOST}:${process.env.PORT_APP}`,
+  "http://localhost:3000",
+  "http://localhost:1700"
+];
 
-app.use(cors({ origin: "*" })); // Webhooks geralmente não precisam de restrição de CORS
+app.use(cors({ origin: "*" })); 
 app.use(express.json());
 
 const httpServer = createServer(app);
 
-// Configuração do Socket.io com suporte a Long Polling e WebSockets
+// 2. Configuração do Socket.io
 const io = new Server(httpServer, {
   cors: {
-    origin: [allowedOrigin, "http://localhost:3000"], // Permite o domínio real e local para testes
+    origin: (origin, callback) => {
+      // Permite requests sem origin (como mobile ou Postman) ou se estiver na lista
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"]
   },
-  transports: ["websocket", "polling"] // Garante compatibilidade
+  transports: ["websocket", "polling"]
 });
 
 io.on("connection", (socket) => {
-  console.log(`[SOCKET CONNECTED] Client ID: ${socket.id}`);
+  console.log(`[SOCKET] Conectado: ${socket.id}`);
 
   socket.on("join_conversation", (conversationId: string) => {
     if (!conversationId) return;
     socket.join(conversationId.toString());
-    console.log(`[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`);
+    console.log(`[ROOM] Socket ${socket.id} entrou na Conversa: ${conversationId}`);
   });
 
   socket.on("join_inbox", (inboxId: string) => {
     if (!inboxId) return;
     socket.join(`inbox_${inboxId}`);
-    console.log(`[JOIN INBOX] Socket ${socket.id} -> Room: inbox_${inboxId}`);
+    console.log(`[ROOM] Socket ${socket.id} entrou no Inbox: ${inboxId}`);
   });
 
   socket.on("disconnect", () => {
-    console.log(`[SOCKET DISCONNECTED] Client ID: ${socket.id}`);
+    console.log(`[SOCKET] Desconectado: ${socket.id}`);
   });
 });
 
-app.get("/health", (_, res) => res.json({ ok: true, domain: process.env.DOMAIN }));
+// 3. Healthcheck para o Docker Compose
+app.get("/health", (_, res) => {
+  res.json({ 
+    status: "ok", 
+    host: process.env.EXTERNAL_HOST,
+    port_app: process.env.PORT_APP 
+  });
+});
 
 app.post("/emit-message", (req, res) => {
   const {
@@ -51,7 +70,7 @@ app.post("/emit-message", (req, res) => {
   } = req.body;
 
   if (!id || !content || !conversationId) {
-    return res.status(400).json({ error: "Invalid message payload" });
+    return res.status(400).json({ error: "Invalid payload" });
   }
 
   const socketPayload = {
@@ -60,19 +79,19 @@ app.post("/emit-message", (req, res) => {
     inboxId, groupName, createdAt,
   };
 
-  console.log(`[EMIT] Msg ${id} | Room: ${conversationId} | From: ${senderName}`);
-
-  // IMPORTANTE: Garantir que conversationId seja string para o io.to()
+  // Envia para a sala da conversa
   io.to(conversationId.toString()).emit("new_message", socketPayload);
 
+  // Envia para a sala do inbox (para atualizar a lista lateral)
   if (inboxId) {
     io.to(`inbox_${inboxId}`).emit("new_message", socketPayload);
   }
 
-  return res.json({ ok: true });
+  return res.json({ sent: true });
 });
 
-const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () =>
-  console.log(`[SERVER] Socket server running on port ${PORT}`)
+// 4. Porta Interna (Sempre a mesma no Docker)
+const PORT = 4000; 
+httpServer.listen(PORT, "0.0.0.0", () =>
+  console.log(`[SERVER] Socket rodando internamente na porta ${PORT}`)
 );

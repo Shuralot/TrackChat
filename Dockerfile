@@ -2,19 +2,18 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 1️⃣ Dependências
 COPY package*.json ./
 RUN npm install
 
-# 2️⃣ Código inteiro
 COPY . .
 
-# 3️⃣ Prisma (AGORA no lugar certo)
+# Gera os artefatos do Prisma (não precisa de DB_URL)
 RUN npx prisma generate
 
-# 4️⃣ Build do Next
+# Faz o build do Next.js
 RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# O segredo está aqui: A migração roda AO INICIAR o container
+CMD npx prisma migrate deploy && npm start
