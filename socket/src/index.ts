@@ -13,18 +13,22 @@ const io = new Server(httpServer, { cors: { origin: "*" } });
 io.on("connection", (socket) => {
   console.log(`[SOCKET CONNECTED] Client ID: ${socket.id}`);
 
-  // 1. Join por Conversa (Já existia)
+  // Join por Conversa (grupo)
   socket.on("join_conversation", (conversationId: string) => {
     if (!conversationId) return;
     socket.join(conversationId);
-    console.log(`[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`);
+    console.log(
+      `[JOIN CONVERSATION] Socket ${socket.id} -> Room: ${conversationId}`
+    );
   });
 
-  // 2. NOVO: Join por Inbox (Para o Dashboard filtrar o canal todo)
+  // Join por Inbox (canal)
   socket.on("join_inbox", (inboxId: string) => {
     if (!inboxId) return;
     socket.join(`inbox_${inboxId}`);
-    console.log(`[JOIN INBOX] Socket ${socket.id} -> Room: inbox_${inboxId}`);
+    console.log(
+      `[JOIN INBOX] Socket ${socket.id} -> Room: inbox_${inboxId}`
+    );
   });
 
   socket.on("disconnect", () => {
@@ -34,27 +38,54 @@ io.on("connection", (socket) => {
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
-// 3. Recebe mensagem do webhook e emite para as salas certas
+// Recebe mensagem do webhook e emite para as salas certas
 app.post("/emit-message", (req, res) => {
-  const message = req.body;
+  const {
+    id,
+    content,
+    sender,
+    senderName,
+    senderPhone,
+    conversationId,
+    inboxId,
+    groupName,
+    createdAt,
+  } = req.body;
 
-  if (!message?.id || !message?.content || !message?.conversationId) {
+  // Validação mínima
+  if (!id || !content || !conversationId) {
     return res.status(400).json({ error: "Invalid message payload" });
   }
 
-  console.log(`[EMIT] Msg ${message.id} to Conv: ${message.conversationId} and Inbox: ${message.inboxId}`);
+  // Payload PADRÃO para o front
+  const socketPayload = {
+    id,
+    content,
+    sender,
+    senderName,
+    senderPhone,
+    conversationId,
+    inboxId,
+    groupName,
+    createdAt,
+  };
 
-  // Emite para quem está ouvindo a conversa específica
-  io.to(message.conversationId).emit("new_message", message);
+  console.log(
+    `[EMIT] Msg ${id} | Group: ${groupName} | From: ${senderName} (${senderPhone})`
+  );
 
-  // Emite para quem está ouvindo o canal (Operacional ou Comercial)
-  // Isso garante que se uma conversa nova surgir, o dashboard do canal certo a receba
-  if (message.inboxId) {
-    io.to(`inbox_${message.inboxId}`).emit("new_message", message);
+  // Emite para a conversa (grupo específico)
+  io.to(conversationId).emit("new_message", socketPayload);
+
+  // Emite para o inbox (canal inteiro)
+  if (inboxId) {
+    io.to(`inbox_${inboxId}`).emit("new_message", socketPayload);
   }
 
   return res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => console.log(`[SERVER] Socket server running on port ${PORT}`));
+httpServer.listen(PORT, () =>
+  console.log(`[SERVER] Socket server running on port ${PORT}`)
+);

@@ -1,18 +1,24 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export type Message = {
   id: string;
   chatwootMessageId?: string;
+
+  // Conteúdo
   content: string;
+
+  // Quem mandou
   sender: "USER" | "AGENT" | "BOT";
-  senderName?: string; 
+  senderName?: string;
+  senderPhone?: string;
+
+  // Grupo / conversa
+  conversationId: string;
+  groupName?: string;
+
   isRead: boolean;
-  conversationId: string; 
-  contact: {
-    id: string;
-    name: string;
-  };
   createdAt: string;
+  inboxId?: number;
 };
 
 type ChatState = {
@@ -24,16 +30,21 @@ type ChatState = {
 
 export const useChatStore = create<ChatState>((set) => ({
   messages: [],
-  
-  // Ajustado para adicionar ao FINAL do array
+
+  // Adiciona mensagem no final (ordem correta)
   addMessage: (message) =>
     set((state) => {
-      // Evita mensagens duplicadas (comum em conexões socket)
-      const exists = state.messages.some(m => m.id === message.id || (m.chatwootMessageId === message.chatwootMessageId && m.chatwootMessageId !== undefined));
+      const exists = state.messages.some(
+        (m) =>
+          m.id === message.id ||
+          (m.chatwootMessageId &&
+            m.chatwootMessageId === message.chatwootMessageId)
+      );
+
       if (exists) return state;
 
       return {
-        messages: [...state.messages, message], // 👈 Agora adiciona no fim
+        messages: [...state.messages, message],
       };
     }),
 

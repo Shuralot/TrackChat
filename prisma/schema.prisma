@@ -10,14 +10,18 @@ datasource db {
 model Conversation {
   id                     String    @id @default(uuid())
   chatwootConversationId String    @unique
+  groupName              String?
+  groupChatwootId        String?
   unreadCount            Int       @default(0)
   status                 String?
   contactId              String?
   lastMessageAt          DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+
   contact                Contact?  @relation(fields: [contactId], references: [id])
   messages               Message[]
+
   chatwootInboxId        String?
 }
 
@@ -33,10 +37,11 @@ model Contact {
 }
 
 model Message {
-  id                String       @id @default(uuid())
+   id                String       @id @default(uuid())
   chatwootMessageId String       @unique
   content           String
   senderName        String?
+  senderPhone       String?
   sender            SenderType
   isRead            Boolean      @default(false)
   conversationId    String
