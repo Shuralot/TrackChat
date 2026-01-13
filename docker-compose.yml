@@ -19,8 +19,8 @@ services:
     build: ./socket
     env_file:
       - .env
+    environment:
+      - DOMAIN=${DOMAIN} # Força a passagem da variável
     ports:
       - "4000:4000"
-    networks:
-      - trackchat-network
-# ... restante do arquivo (db, volumes, networks)
+    restart: always
