@@ -3,15 +3,16 @@ services:
     build:
       context: .
       args:
-        # IMPORTANTE: Agora aponta para a porta externa 1750 do socket
         - NEXT_PUBLIC_SOCKET_URL=http://${DOMAIN}:1701
     env_file:
       - .env
     ports:
-      - "1700:3000" # Acessa no navegador por :1700, mas o Next roda na 3000 interna
+      - "1700:3000"
     depends_on:
-      - db
-      - socket
+      db:
+        condition: service_healthy
+      socket:
+        condition: service_started
     networks:
       - trackchat-network
 
@@ -21,9 +22,9 @@ services:
       - .env
     environment:
       - DOMAIN=${DOMAIN}
-      - PORT=4000 # Porta interna que o código do socket escuta
+      - PORT=4000
     ports:
-      - "1701:4000" # Acessa externamente por :1750
+      - "1701:4000"
     restart: always
     networks:
       - trackchat-network
@@ -31,13 +32,18 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: trackchat
-      POSTGRES_PASSWORD: trackchat
-      POSTGRES_DB: trackchat
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U AiAtende -d trackchat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "1750:5432" # Mantive a padrão do banco, a menos que queira mudar também
+      - "1750:5432"
     networks:
       - trackchat-network
 
