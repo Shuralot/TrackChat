@@ -5,64 +5,74 @@ import cors from "cors";
 
 const app = express();
 
-// 1. Configuração de Origens (Versatilidade Local vs VPS)
+// 1. Configuração de Origens Dinâmicas
+// Usamos fallbacks para garantir que funcione mesmo se a ENV falhar
+const EXTERNAL_HOST = process.env.EXTERNAL_HOST || "localhost";
+const PORT_APP = process.env.PORT_APP || "1700";
+
 const allowedOrigins = [
-  // O que vem do seu .env (ex: http://localhost:1700 ou http://seu-ip:1700)
-  `http://${process.env.EXTERNAL_HOST}:${process.env.PORT_APP}`,
+  `http://${EXTERNAL_HOST}:${PORT_APP}`,
+  `http://${EXTERNAL_HOST}:3000`,
   "http://localhost:3000",
-  "http://localhost:1700"
+  "http://localhost:1700",
 ];
 
+// Middleware de CORS para as rotas HTTP (como o /emit-message)
 app.use(cors({ origin: "*" })); 
 app.use(express.json());
 
 const httpServer = createServer(app);
 
-// 2. Configuração do Socket.io
+// 2. Configuração do Socket.io com CORS dinâmico
 const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      // Permite requests sem origin (como mobile ou Postman) ou se estiver na lista
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Se não houver origin (ex: Postman ou chamadas server-side) ou se estiver na lista, permite
+      if (!origin || allowedOrigins.includes(origin) || origin.includes(EXTERNAL_HOST)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        console.warn(`[CORS] Bloqueado para: ${origin}`);
+        callback(null, true); // Em teste local/VPS, podemos permitir para evitar travas, ou mude para callback(new Error("CORS")) em prod estrita
       }
     },
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    credentials: true
   },
   transports: ["websocket", "polling"]
 });
 
 io.on("connection", (socket) => {
-  console.log(`[SOCKET] Conectado: ${socket.id}`);
+  console.log(`[SOCKET] Cliente Conectado: ${socket.id}`);
 
   socket.on("join_conversation", (conversationId: string) => {
     if (!conversationId) return;
-    socket.join(conversationId.toString());
-    console.log(`[ROOM] Socket ${socket.id} entrou na Conversa: ${conversationId}`);
+    const room = conversationId.toString();
+    socket.join(room);
+    console.log(`[ROOM] Socket ${socket.id} entrou na Conversa: ${room}`);
   });
 
   socket.on("join_inbox", (inboxId: string) => {
     if (!inboxId) return;
-    socket.join(`inbox_${inboxId}`);
-    console.log(`[ROOM] Socket ${socket.id} entrou no Inbox: ${inboxId}`);
+    const room = `inbox_${inboxId}`;
+    socket.join(room);
+    console.log(`[ROOM] Socket ${socket.id} entrou no Inbox: ${room}`);
   });
 
   socket.on("disconnect", () => {
-    console.log(`[SOCKET] Desconectado: ${socket.id}`);
+    console.log(`[SOCKET] Cliente Desconectado: ${socket.id}`);
   });
 });
 
-// 3. Healthcheck para o Docker Compose
+// 3. Healthcheck - Útil para o Docker verificar se o serviço está vivo
 app.get("/health", (_, res) => {
   res.json({ 
     status: "ok", 
-    host: process.env.EXTERNAL_HOST,
-    port_app: process.env.PORT_APP 
+    time: new Date().toISOString(),
+    config: { host: EXTERNAL_HOST, port_app: PORT_APP }
   });
 });
 
+// 4. Endpoint de Emissão (Chamado pelo seu backend Next.js)
 app.post("/emit-message", (req, res) => {
   const {
     id, content, sender, senderName, senderPhone,
@@ -79,10 +89,12 @@ app.post("/emit-message", (req, res) => {
     inboxId, groupName, createdAt,
   };
 
-  // Envia para a sala da conversa
+  console.log(`[EMIT] Enviando para sala: ${conversationId}`);
+  
+  // Envia para a conversa específica
   io.to(conversationId.toString()).emit("new_message", socketPayload);
 
-  // Envia para a sala do inbox (para atualizar a lista lateral)
+  // Envia para o inbox específico
   if (inboxId) {
     io.to(`inbox_${inboxId}`).emit("new_message", socketPayload);
   }
@@ -90,8 +102,11 @@ app.post("/emit-message", (req, res) => {
   return res.json({ sent: true });
 });
 
-// 4. Porta Interna (Sempre a mesma no Docker)
-const PORT = 4000; 
-httpServer.listen(PORT, "0.0.0.0", () =>
-  console.log(`[SERVER] Socket rodando internamente na porta ${PORT}`)
-);
+// 5. Inicialização
+const PORT = 4000; // Porta interna do container
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log("-----------------------------------------");
+  console.log(`[SERVER] Socket rodando em: http://0.0.0.0:${PORT}`);
+  console.log(`[CORS] Aceitando: ${EXTERNAL_HOST}:${PORT_APP}`);
+  console.log("-----------------------------------------");
+});

@@ -113,10 +113,14 @@ export async function POST(req: Request) {
   });
 
   // -----------------------------
-  // 📡 SOCKET
-  // -----------------------------
+// 📡 SOCKET (Ajustado)
+// -----------------------------
 
-  await fetch(`${process.env.SOCKET_SERVER_URL}/emit-message`, {
+// Usamos a variável interna para comunicação entre containers (server-to-server)
+const SOCKET_INTERNAL_URL = process.env.SOCKET_SERVER_INTERNAL_URL || "http://socket:4000";
+
+try {
+  await fetch(`${SOCKET_INTERNAL_URL}/emit-message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -131,6 +135,9 @@ export async function POST(req: Request) {
       createdAt: message.createdAt,
     }),
   });
+} catch (error) {
+  console.error("❌ Erro ao enviar para o Socket:", error);
+}
 
   return NextResponse.json({ ok: true });
 }

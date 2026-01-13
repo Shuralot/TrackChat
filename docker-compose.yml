@@ -8,6 +8,8 @@ services:
       - .env
     ports:
       - "${PORT_APP}:3000"
+    environment:
+      - SOCKET_SERVER_INTERNAL_URL=${SOCKET_SERVER_INTERNAL_URL}
     depends_on:
       db:
         condition: service_healthy
@@ -21,13 +23,13 @@ services:
     env_file:
       - .env
     environment:
-      - DOMAIN=${DOMAIN}
+      - EXTERNAL_HOST=${EXTERNAL_HOST}
+      - PORT_APP=${PORT_APP}
     ports:
       - "${PORT_SOCKET}:4000"
     restart: always
     networks:
       - trackchat-network
-
   db:
     image: postgres:15
     restart: always
