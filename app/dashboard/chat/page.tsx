@@ -1,3 +1,5 @@
+// ./app/dashboard/chat/page.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";

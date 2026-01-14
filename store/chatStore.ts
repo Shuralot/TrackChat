@@ -1,3 +1,4 @@
+// ./store/chatStore.ts
 import { create } from "zustand";
 
 export type Message = {

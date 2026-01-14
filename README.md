@@ -109,7 +109,7 @@ src/
 
 ```
 # Rede
-EXTERNAL_HOST=localhost # Na VPS, mude para o IP ou domínio
+APP_SERVICE_NAME=localhost # Na VPS, mude para o IP ou domínio
 PORT_APP=6666
 PORT_SOCKET=7777
 
@@ -120,7 +120,7 @@ POSTGRES_DB=BatataDB
 DATABASE_URL=postgresql://Batata:Batata26@db:5432/BatataDB
 
 # URLs
-NEXT_PUBLIC_SOCKET_URL=http://${EXTERNAL_HOST}:${PORT_SOCKET}
+NEXT_PUBLIC_SOCKET_URL=http://${APP_SERVICE_NAME}:${PORT_SOCKET}
 SOCKET_SERVER_INTERNAL_URL=http://socket:4000
 
 ```

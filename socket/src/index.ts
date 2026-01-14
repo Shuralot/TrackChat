@@ -1,3 +1,4 @@
+// ./socket/src/index.ts
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -7,12 +8,10 @@ const app = express();
 
 // 1. Configuração de Origens Dinâmicas
 // Usamos fallbacks para garantir que funcione mesmo se a ENV falhar
-const EXTERNAL_HOST = process.env.EXTERNAL_HOST || "localhost";
-const PORT_APP = process.env.PORT_APP || "1700";
+const APP_URL = process.env.APP_URL || `http://localhost:3000`;
 
 const allowedOrigins = [
-  `http://${EXTERNAL_HOST}:${PORT_APP}`,
-  `http://${EXTERNAL_HOST}:3000`,
+  `${APP_URL}`,
   "http://localhost:3000",
   "http://localhost:1700",
   "179.73.180.164"
@@ -29,7 +28,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
       // Se não houver origin (ex: Postman ou chamadas server-side) ou se estiver na lista, permite
-      if (!origin || allowedOrigins.includes(origin) || origin.includes(EXTERNAL_HOST)) {
+      if (!origin || allowedOrigins.includes(origin) || origin.includes(APP_URL)) {
         callback(null, true);
       } else {
         console.warn(`[CORS] Bloqueado para: ${origin}`);
@@ -69,7 +68,7 @@ app.get("/health", (_, res) => {
   res.json({ 
     status: "ok", 
     time: new Date().toISOString(),
-    config: { host: EXTERNAL_HOST, port_app: PORT_APP }
+    config: { host: APP_URL }
   });
 });
 
@@ -108,6 +107,6 @@ const PORT = 4000; // Porta interna do container
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log("-----------------------------------------");
   console.log(`[SERVER] Socket rodando em: http://0.0.0.0:${PORT}`);
-  console.log(`[CORS] Aceitando: ${EXTERNAL_HOST}:${PORT_APP}`);
+  console.log(`[CORS] Aceitando: ${APP_URL}`);
   console.log("-----------------------------------------");
 });
