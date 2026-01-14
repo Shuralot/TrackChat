@@ -108,12 +108,20 @@ src/
 ## ⚙️ Variáveis de Ambiente
 
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/trackchat
-NODE_ENV=development
+# Rede
+EXTERNAL_HOST=localhost # Na VPS, mude para o IP ou domínio
+PORT_APP=6666
+PORT_SOCKET=7777
 
-NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
-SOCKET_SERVER_URL=http://localhost:4000
+# Banco
+POSTGRES_USER=Batata
+POSTGRES_PASSWORD=Batata26
+POSTGRES_DB=BatataDB
+DATABASE_URL=postgresql://Batata:Batata26@db:5432/BatataDB
 
+# URLs
+NEXT_PUBLIC_SOCKET_URL=http://${EXTERNAL_HOST}:${PORT_SOCKET}
+SOCKET_SERVER_INTERNAL_URL=http://socket:4000
 ```
 
 ---
