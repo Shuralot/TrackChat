@@ -15,7 +15,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432"
+      - "5432:5432"
     networks:
       - trackchat-network
       
@@ -24,12 +24,15 @@ services:
       context: .
       args:
         - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+        - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     env_file:
       - .env
     ports:
       - "${PORT_APP:-3000}:3000"
     environment:
       - SOCKET_SERVER_INTERNAL_URL=${SOCKET_SERVER_INTERNAL_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
     depends_on:
       db:
         condition: service_healthy

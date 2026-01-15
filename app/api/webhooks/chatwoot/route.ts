@@ -117,8 +117,12 @@ export async function POST(req: Request) {
 // 📡 SOCKET (Ajustado)
 // -----------------------------
 
-// Usamos a variável interna para comunicação entre containers (server-to-server)
-const SOCKET_INTERNAL_URL = process.env.SOCKET_SERVER_INTERNAL_URL || "http://socket:4000";
+// Usamos preferencialmente a variável interna para comunicação entre containers (server-to-server)
+// Em ambientes locais de desenvolvimento também suportamos `SOCKET_SERVER_URL` apontando para localhost.
+const SOCKET_INTERNAL_URL =
+  process.env.SOCKET_SERVER_INTERNAL_URL ||
+  process.env.SOCKET_SERVER_URL ||
+  "http://localhost:4000";
 
 try {
   await fetch(`${SOCKET_INTERNAL_URL}/emit-message`, {
