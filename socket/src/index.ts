@@ -103,10 +103,11 @@ app.post("/emit-message", (req, res) => {
 });
 
 // 5. Inicialização
-const PORT = 4000; // Porta interna do container
+const PORT = Number(process.env.PORT || process.env.PORT_SOCKET || 4000); // permite sobrescrever por env
 httpServer.listen(PORT, "0.0.0.0", () => {
   console.log("-----------------------------------------");
   console.log(`[SERVER] Socket rodando em: http://0.0.0.0:${PORT}`);
   console.log(`[CORS] Aceitando: ${APP_URL}`);
+  console.log(`[INFO] allowedOrigins: ${allowedOrigins.join(", ")}`);
   console.log("-----------------------------------------");
 });
